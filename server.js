@@ -23,7 +23,7 @@ const pool = new Pool({ ssl: { rejectUnauthorized: false } });
 const sqlInsertUser =
   "INSERT INTO public.shop(shop, access_token, date_joined, user_scope, user_first_name, user_last_name, user_email, locale, is_owner, is_collaborator, is_email_verified, is_active) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *";
 
-const { SHOPIFY_API_SECRET_KEY, SHOPIFY_API_KEY } = process.env;
+const { SHOPIFY_API_SECRET_KEY, SHOPIFY_API_KEY, HOST } = process.env;
 
 app.prepare().then(() => {
   const server = new Koa();
@@ -50,11 +50,19 @@ app.prepare().then(() => {
         });
 
         // Has the sign up for the paid subscription on installation
-        await getSubscriptionUrl(ctx, accessToken, shop);
+        const returnUrl = `${HOST}?shop=${shop}`;
+        await getSubscriptionUrl(accessToken, shop, returnUrl);
+        const subscriptionUrl = await getSubscriptionUrl(
+          accessToken,
+          shop,
+          returnUrl
+        );
+
+        const now = new Date();
+        let userActive = true;
 
         try {
-          const now = new Date();
-          const values = [
+          let values = [
             shop, //shop
             accessToken, //access_token
             now, //date_joined
@@ -66,11 +74,28 @@ app.prepare().then(() => {
             associatedUser.account_owner, //is_owner
             associatedUser.collaborator, //is_collaborator
             associatedUser.email_verified, //is_email_verified
-            true, // is_active
+            userActive, //is_active
           ];
           const res = await pool.query(sqlInsertUser, values);
+          ctx.redirect(subscriptionUrl);
         } catch (err) {
+          let values = [
+            shop, //shop
+            accessToken, //access_token
+            now, //date_joined
+            associatedUserScope, //user_scope
+            associatedUser.first_name, //user_first_name
+            associatedUser.last_name, //user_last_name
+            associatedUser.email, //user_email
+            associatedUser.locale, //locale
+            associatedUser.account_owner, //is_owner
+            associatedUser.collaborator, //is_collaborator
+            associatedUser.email_verified, //is_email_verified
+            !userActive, //is_active
+          ];
+          const res = await pool.query(sqlInsertUser, values);
           console.log(err.stack);
+          ctx.redirect(subscriptionUrl);
         }
       },
     })

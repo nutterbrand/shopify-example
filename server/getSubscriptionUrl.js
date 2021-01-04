@@ -1,9 +1,13 @@
-const getSubscriptionUrl = async (ctx, accessToken, shop) => {
+const getSubscriptionUrl = async (
+  accessToken,
+  shop,
+  returnUrl = process.env.HOST
+) => {
   const query = JSON.stringify({
     query: `mutation {
       appSubscriptionCreate(
           name: "Super Duper Plan"
-          returnUrl: "${process.env.HOST}"
+          returnUrl: "${returnUrl}"
           test: true
           lineItems: [
           {
@@ -40,9 +44,7 @@ const getSubscriptionUrl = async (ctx, accessToken, shop) => {
   );
 
   const responseJson = await response.json();
-  const confirmationUrl =
-    responseJson.data.appSubscriptionCreate.confirmationUrl;
-  return ctx.redirect(confirmationUrl);
+  return responseJson.data.appSubscriptionCreate.confirmationUrl;
 };
 
 module.exports = getSubscriptionUrl;
